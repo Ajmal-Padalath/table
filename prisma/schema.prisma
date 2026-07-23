@@ -1,0 +1,150 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Restaurant {
+  id                String   @id @default(uuid())
+  name              String
+  logo              String?
+  description       String?
+  phone             String?
+  email             String?
+  address           String?
+  taxRate           Float    @default(5.0)       // Percentage (e.g. 5%)
+  serviceChargeRate Float    @default(10.0)      // Percentage (e.g. 10%)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   // "ADMIN", "KITCHEN", "WAITER"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Table {
+  id        String   @id @default(uuid())
+  number    String   @unique
+  capacity  Int      @default(4)
+  status    String   @default("AVAILABLE") // "AVAILABLE", "OCCUPIED", "WAITING", "READY_TO_SERVE"
+  qrCodeUrl String?
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id        String     @id @default(uuid())
+  name      String
+  slug      String     @unique
+  image     String?
+  foodItems FoodItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model FoodItem {
+  id              String      @id @default(uuid())
+  name            String
+  description     String
+  price           Float
+  rating          Float       @default(4.5)
+  isVeg           Boolean     @default(true)
+  preparationTime Int         @default(15) // In minutes
+  isAvailable     Boolean     @default(true)
+  image           String?
+  categoryId      String
+  category        Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  variants        Variant[]
+  extras          Extra[]
+  orderItems      OrderItem[]
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model Variant {
+  id         String   @id @default(uuid())
+  name       String   // e.g. "Small", "Medium", "Large"
+  price      Float    // Price difference or absolute price. Let's make it absolute.
+  foodItemId String
+  foodItem   FoodItem @relation(fields: [foodItemId], references: [id], onDelete: Cascade)
+}
+
+model Extra {
+  id         String   @id @default(uuid())
+  name       String   // e.g. "Extra Cheese", "Jalapenos"
+  price      Float    // Price of this extra
+  foodItemId String
+  foodItem   FoodItem @relation(fields: [foodItemId], references: [id], onDelete: Cascade)
+}
+
+model Customer {
+  id           String   @id @default(uuid())
+  name         String
+  phone        String?
+  sessionToken String   @unique
+  orders       Order[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Order {
+  id             String      @id @default(uuid())
+  orderNumber    String      @unique // e.g., "ORD-1001"
+  tableId        String
+  table          Table       @relation(fields: [tableId], references: [id])
+  customerId     String
+  customer       Customer    @relation(fields: [customerId], references: [id])
+  status         String      @default("PENDING") // "PENDING", "PREPARING", "READY", "SERVED", "COMPLETED", "CANCELLED"
+  paymentStatus  String      @default("PENDING") // "PENDING", "PAID", "FAILED"
+  paymentMethod  String      @default("COUNTER_CASH") // "COUNTER_CASH", "COUNTER_CARD", "ONLINE_STRIPE"
+  specialRequest String?
+  subtotal       Float
+  tax            Float
+  serviceCharge  Float
+  totalAmount    Float
+  orderItems     OrderItem[]
+  payments       Payment[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model OrderItem {
+  id         String   @id @default(uuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  foodItemId String
+  foodItem   FoodItem @relation(fields: [foodItemId], references: [id])
+  quantity   Int
+  spiceLevel String?  // e.g. "Mild", "Medium", "Spicy"
+  size       String?  // variant name selected
+  extras     String?  // Comma-separated list of extra names selected or JSON
+  price      Float    // Price of item + variants + extras at purchase
+  notes      String?  // Special instruction for this item
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Payment {
+  id              String   @id @default(uuid())
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  stripeSessionId String?  @unique
+  amount          Float
+  status          String   @default("PENDING") // "PENDING", "PAID", "FAILED"
+  method          String   // "COUNTER_CASH", "COUNTER_CARD", "ONLINE_STRIPE"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
